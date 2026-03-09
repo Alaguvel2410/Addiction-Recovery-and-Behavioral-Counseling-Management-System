@@ -1,0 +1,332 @@
+/*Create Database & Tables [7]– Stores users, questions, answer options, assessments, responses, results, and tips.
+Insert Data – Adds sample users, questions, options, and tips.
+Record Assessments & Responses – Each user’s answers to questions are stored.
+Auto-Calculate Results – Trigger sums scores and assigns addiction levels.
+Procedures & Functions – Reusable blocks to add assessments and get addiction levels.
+Final Report – Query shows each user’s score, addiction level, and tips in one place.*/
+/* 
+/* ------------------------------
+   ADDICTION RECOVERY SYSTEM 
+   ------------------------------ */
+DROP DATABASE IF EXISTS addiction_recovery_system;
+-- CREATE DATABASE
+CREATE DATABASE  addiction_recovery_system;
+USE addiction_recovery_system; 
+-- USERS TABLE
+CREATE TABLE IF NOT EXISTS users(
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    age INT NOT NULL,
+    ph_no VARCHAR(15) NOT NULL,
+    type_of_addiction VARCHAR(50) NOT NULL);
+-- QUESTIONS TABLE
+CREATE TABLE IF NOT EXISTS questions(
+    question_id INT AUTO_INCREMENT PRIMARY KEY,
+    question_text TEXT);
+INSERT INTO questions(question_text) VALUES
+('I spend more time on this activity than I originally planned.'),
+('I frequently think about this activity even when I am not doing it.'),
+('I feel a strong urge or craving to engage in this activity.'),
+('I find it difficult to reduce or stop this behavior.'),
+('This activity interferes with my work or studies.'),
+('I feel restless when I cannot engage in this activity.'),
+('I continue this activity even when it causes problems.'),
+('I neglect important tasks because of this activity.'),
+('My family or friends are concerned about this behavior.'),
+('I feel the need to increase time spent on this activity.'),
+('I lose track of time while doing this activity.'),
+('I feel guilty after engaging in this activity.'),
+('I use this activity to escape stress or problems.'),
+('I feel anxious when unable to perform this activity.'),
+('I prioritize this activity over social interactions.'),
+('I feel satisfied only when doing this activity.'),
+('I try to hide this behavior from others.'),
+('I feel frustrated when interrupted during this activity.'),
+('I often plan my day around this activity.'),
+('I feel unable to control the urge to perform this activity.');
+-- OPTIONS TABLE
+CREATE TABLE IF NOT EXISTS options_table(
+    option_id INT AUTO_INCREMENT PRIMARY KEY,
+    option_text VARCHAR(50),
+    score INT);
+INSERT INTO options_table(option_text,score) VALUES
+('Rarely',1),
+('Sometimes',2),
+('Often',3),
+('Always',4);
+-- ASSESSMENT TABLE
+CREATE TABLE IF NOT EXISTS assessment(
+    assessment_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    assessment_date DATE,
+    FOREIGN KEY(user_id) REFERENCES users(user_id));
+-- RESPONSES TABLE
+CREATE TABLE IF NOT EXISTS responses(
+    response_id INT AUTO_INCREMENT PRIMARY KEY,
+    assessment_id INT,
+    question_id INT,
+    option_id INT,
+    FOREIGN KEY(assessment_id) REFERENCES assessment(assessment_id),
+    FOREIGN KEY(question_id) REFERENCES questions(question_id),
+    FOREIGN KEY(option_id) REFERENCES options_table(option_id));
+-- RESULTS TABLE
+CREATE TABLE IF NOT EXISTS results(
+    result_id INT AUTO_INCREMENT PRIMARY KEY,
+    assessment_id INT UNIQUE,
+    total_score INT,
+    addiction_level VARCHAR(50),
+    message TEXT,
+    FOREIGN KEY(assessment_id) REFERENCES assessment(assessment_id));
+-- TIPS TABLE
+CREATE TABLE IF NOT EXISTS tips(
+    tip_id INT AUTO_INCREMENT PRIMARY KEY,
+    addiction_level VARCHAR(50),
+    tip_text TEXT);
+INSERT INTO tips(addiction_level,tip_text) VALUES
+('No Addiction','Follow healthy habits, Thats enough for u.'),
+('Low Addiction','Set daily limits and delay urges.'),
+('Moderate Addiction','Create structured daily routines.'),
+('Moderate Addiction','Use replacement habits.'),
+('High Addiction','Consult a professional counselor.'),
+('High Addiction','Seek professional treatment.');
+-- TRIGGER TO AUTO CALCULATE RESULTS
+-- drop TRIGGER calculate_score;
+DELIMITER //
+CREATE TRIGGER calculate_score
+AFTER INSERT ON responses
+FOR EACH ROW
+BEGIN
+    INSERT INTO results(assessment_id,total_score,addiction_level,message)
+    SELECT 
+        r.assessment_id,
+        SUM(o.score),
+        CASE
+            WHEN SUM(o.score) BETWEEN 20 AND 30 THEN 'No Addiction'
+            WHEN SUM(o.score) BETWEEN 31 AND 45 THEN 'Low Addiction'
+            WHEN SUM(o.score) BETWEEN 46 AND 60 THEN 'Moderate Addiction'
+            WHEN SUM(o.score) BETWEEN 61 AND 80 THEN 'High Addiction'
+        END,
+        'This is only a self-check assessment,not the medical diagnosis'
+    FROM responses r
+    JOIN options_table o ON r.option_id = o.option_id
+    WHERE r.assessment_id = NEW.assessment_id
+    GROUP BY r.assessment_id
+    ON DUPLICATE KEY UPDATE
+        total_score = VALUES(total_score),
+        addiction_level = VALUES(addiction_level),
+        message = VALUES(message);
+END //
+DELIMITER ;
+-- Procedure to insert a new assessmentline by line
+DELIMITER //
+CREATE PROCEDURE add_assessment(IN s_user_id INT)
+BEGIN
+    INSERT INTO assessment(user_id, assessment_date)
+    VALUES (s_user_id, CURDATE());
+END //
+DELIMITER ;
+-- Function to get addiction message based on score
+DELIMITER //
+CREATE FUNCTION get_addiction_level(s_score INT)
+RETURNS VARCHAR(50)
+DETERMINISTIC
+BEGIN
+    DECLARE level VARCHAR(50);
+    IF p_score BETWEEN 20 AND 30 THEN
+        SET level = 'No Addiction';
+    ELSEIF p_score BETWEEN 31 AND 45 THEN
+        SET level = 'Low Addiction';
+    ELSEIF p_score BETWEEN 46 AND 60 THEN
+        SET level = 'Moderate Addiction';
+    ELSEIF p_score BETWEEN 61 AND 80 THEN
+        SET level = 'High Addiction';
+    /*ELSE
+        SET level = 'Unknown';*/
+    END IF;
+    RETURN level;
+END //
+DELIMITER ;
+-- SAMPLE USERS
+INSERT INTO users(name,age,ph_no,type_of_addiction) VALUES
+('User1',21,'9000000001','Social Media'),
+('User2',22,'9000000002','Gaming'),
+('User3',23,'9000000003','Shopping'),
+('User4',24,'9000000004','Alcohol'),
+('User5',25,'9000000005','Internet'),
+('User6',22,'9000000006','Social Media'),
+('User7',23,'9000000007','Gaming'),
+('User8',21,'9000000008','Shopping'),
+('User9',24,'9000000009','Alcohol'),
+('User10',25,'9000000010','Internet'),
+('User11',21,'9000000011','Social Media'),
+('User12',22,'9000000012','Gaming'),
+('User13',23,'9000000013','Shopping'),
+('User14',24,'9000000014','Alcohol'),
+('User15',25,'9000000015','Internet'),
+('User16',21,'9000000016','Social Media'),
+('User17',22,'9000000017','Gaming'),
+('User18',23,'9000000018','Shopping'),
+('User19',24,'9000000019','Alcohol'),
+('User20',25,'9000000020','Internet');
+-- CREATE ASSESSMENTS
+INSERT INTO assessment(user_id,assessment_date)
+SELECT user_id, CURDATE() FROM users;
+-- user responses
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(1,1,3),(1,2,4),(1,3,2),(1,4,3),(1,5,4),
+(1,6,3),(1,7,2),(1,8,3),(1,9,4),(1,10,3),
+(1,11,2),(1,12,3),(1,13,2),(1,14,3),(1,15,4),
+(1,16,4),(1,17,3),(1,18,4),(1,19,2),(1,20,3);
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(2,1,2),(2,2,3),(2,3,3),(2,4,2),(2,5,4),
+(2,6,2),(2,7,3),(2,8,4),(2,9,3),(2,10,2),
+(2,11,3),(2,12,2),(2,13,4),(2,14,3),(2,15,2),
+(2,16,3),(2,17,4),(2,18,3),(2,19,2),(2,20,3);
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(3,1,2),(3,2,1),(3,3,4),(3,4,3),(3,5,1),
+(3,6,4),(3,7,2),(3,8,1),(3,9,3),(3,10,4),
+(3,11,1),(3,12,3),(3,13,4),(3,14,2),(3,15,1),
+(3,16,3),(3,17,2),(3,18,4),(3,19,1),(3,20,2);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(4,1,3),(4,2,2),(4,3,1),(4,4,4),(4,5,2),
+(4,6,1),(4,7,3),(4,8,2),(4,9,4),(4,10,1),
+(4,11,3),(4,12,4),(4,13,1),(4,14,2),(4,15,3),
+(4,16,1),(4,17,4),(4,18,2),(4,19,3),(4,20,1);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(5,1,4),(5,2,1),(5,3,3),(5,4,2),(5,5,1),
+(5,6,3),(5,7,4),(5,8,1),(5,9,2),(5,10,3),
+(5,11,4),(5,12,1),(5,13,3),(5,14,4),(5,15,2),
+(5,16,4),(5,17,1),(5,18,3),(5,19,4),(5,20,2);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(6,1,2),(6,2,4),(6,3,1),(6,4,3),(6,5,4),
+(6,6,2),(6,7,1),(6,8,3),(6,9,4),(6,10,2),
+(6,11,1),(6,12,4),(6,13,2),(6,14,1),(6,15,3),
+(6,16,2),(6,17,3),(6,18,1),(6,19,4),(6,20,3);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(7,1,1),(7,2,3),(7,3,4),(7,4,2),(7,5,3),
+(7,6,4),(7,7,2),(7,8,1),(7,9,3),(7,10,4),
+(7,11,2),(7,12,3),(7,13,1),(7,14,4),(7,15,2),
+(7,16,3),(7,17,1),(7,18,4),(7,19,2),(7,20,1);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(8,1,3),(8,2,1),(8,3,2),(8,4,4),(8,5,1),
+(8,6,3),(8,7,4),(8,8,2),(8,9,1),(8,10,3),
+(8,11,4),(8,12,2),(8,13,3),(8,14,1),(8,15,4),
+(8,16,2),(8,17,3),(8,18,1),(8,19,4),(8,20,2);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(9,1,4),(9,2,2),(9,3,3),(9,4,1),(9,5,2),
+(9,6,4),(9,7,1),(9,8,3),(9,9,2),(9,10,4),
+(9,11,1),(9,12,3),(9,13,4),(9,14,2),(9,15,1),
+(9,16,4),(9,17,2),(9,18,3),(9,19,1),(9,20,4);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(10,1,2),(10,2,4),(10,3,1),(10,4,3),(10,5,4),
+(10,6,1),(10,7,3),(10,8,4),(10,9,2),(10,10,1),
+(10,11,3),(10,12,2),(10,13,4),(10,14,3),(10,15,1),
+(10,16,3),(10,17,4),(10,18,2),(10,19,3),(10,20,1);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(11,1,1),(11,2,3),(11,3,2),(11,4,4),(11,5,3),
+(11,6,2),(11,7,4),(11,8,1),(11,9,3),(11,10,2),
+(11,11,4),(11,12,1),(11,13,3),(11,14,4),(11,15,2),
+(11,16,1),(11,17,3),(11,18,4),(11,19,2),(11,20,3);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(12,1,4),(12,2,1),(12,3,3),(12,4,2),(12,5,1),
+(12,6,4),(12,7,2),(12,8,3),(12,9,1),(12,10,4),
+(12,11,2),(12,12,3),(12,13,1),(12,14,4),(12,15,3),
+(12,16,2),(12,17,4),(12,18,1),(12,19,3),(12,20,2);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(13,1,3),(13,2,2),(13,3,4),(13,4,1),(13,5,2),
+(13,6,3),(13,7,1),(13,8,4),(13,9,2),(13,10,3),
+(13,11,1),(13,12,4),(13,13,2),(13,14,1),(13,15,3),
+(13,16,4),(13,17,2),(13,18,3),(13,19,4),(13,20,1);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(14,1,2),(14,2,4),(14,3,1),(14,4,3),(14,5,4),
+(14,6,2),(14,7,3),(14,8,1),(14,9,4),(14,10,2),
+(14,11,3),(14,12,1),(14,13,4),(14,14,2),(14,15,3),
+(14,16,1),(14,17,4),(14,18,2),(14,19,1),(14,20,4);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(15,1,1),(15,2,3),(15,3,4),(15,4,2),(15,5,3),
+(15,6,1),(15,7,4),(15,8,2),(15,9,3),(15,10,1),
+(15,11,4),(15,12,2),(15,13,3),(15,14,4),(15,15,1),
+(15,16,3),(15,17,2),(15,18,4),(15,19,1),(15,20,3);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(16,1,4),(16,2,1),(16,3,2),(16,4,3),(16,5,1),
+(16,6,4),(16,7,3),(16,8,2),(16,9,1),(16,10,4),
+(16,11,2),(16,12,3),(16,13,4),(16,14,1),(16,15,2),
+(16,16,4),(16,17,1),(16,18,3),(16,19,2),(16,20,4);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(17,1,3),(17,2,2),(17,3,1),(17,4,1),(17,5,2),
+(17,6,1),(17,7,1),(17,8,1),(17,9,2),(17,10,3),
+(17,11,1),(17,12,1),(17,13,2),(17,14,1),(17,15,1),
+(17,16,2),(17,17,3),(17,18,1),(17,19,1),(17,20,2);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(18,1,1),(18,2,1),(18,3,3),(18,4,1),(18,5,2),
+(18,6,1),(18,7,1),(18,8,1),(18,9,2),(18,10,2),
+(18,11,1),(18,12,1),(18,13,1),(18,14,2),(18,15,1),
+(18,16,1),(18,17,1),(18,18,2),(18,19,2),(18,20,1);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(19,1,1),(19,2,3),(19,3,4),(19,4,2),(19,5,3),
+(19,6,4),(19,7,2),(19,8,1),(19,9,3),(19,10,4),
+(19,11,2),(19,12,1),(19,13,3),(19,14,4),(19,15,2),
+(19,16,1),(19,17,3),(19,18,4),(19,19,2),(19,20,3);
+
+INSERT INTO responses(assessment_id,question_id,option_id) VALUES
+(20,1,4),(20,2,2),(20,3,1),(20,4,3),(20,5,2),
+(20,6,1),(20,7,4),(20,8,3),(20,9,2),(20,10,1),
+(20,11,3),(20,12,4),(20,13,2),(20,14,1),(20,15,3),
+(20,16,4),(20,17,2),(20,18,1),(20,19,3),(20,20,4);
+
+
+-- FINAL OUTPUT 
+SELECT 
+    u.user_id, u.name, u.type_of_addiction,
+    CONCAT(r.total_score,' / 80') AS score,
+    r.addiction_level,
+    GROUP_CONCAT(t.tip_text SEPARATOR ' | ') AS tips
+FROM results r
+JOIN assessment a ON r.assessment_id = a.assessment_id
+JOIN users u ON a.user_id = u.user_id
+left JOIN tips t ON r.addiction_level = t.addiction_level
+GROUP BY u.user_id,u.name,u.type_of_addiction,r.total_score,r.addiction_level;
+
+
+-------------------------------------------------
+-- analysis for management side
+-------------------------------------------------
+-- TOTAL NUMBER OF USERS
+SELECT COUNT(*) AS total_users FROM users;
+-- NUMBER OF USERS PER ADDICTION TYPE
+SELECT type_of_addiction,COUNT(*) AS users
+FROM users
+GROUP BY type_of_addiction;
+-- HIGHEST SCORE
+SELECT MAX(total_score) AS highest_score FROM results;
+-- Total tests
+SELECT COUNT(*) AS total_tests_taken
+FROM assessment;
+-- Lowest score
+SELECT MIN(total_score) AS minimum_score
+FROM results;
+-- Average score
+SELECT AVG(total_score) AS average_score
+FROM results;
+-- Addiction level distribution
+SELECT addiction_level, COUNT(*) AS number_of_users
+FROM results
+GROUP BY addiction_level;
+
+set sql_safe_updates=0;
